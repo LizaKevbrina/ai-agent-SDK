@@ -2,7 +2,7 @@
 
 #  AI Sales Agent
 
-** AI-агент для автоматизации продаж в недвижимости**
+**AI-агент для автоматизации продаж в недвижимости**
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue?style=for-the-badge&logo=python)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Production-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
