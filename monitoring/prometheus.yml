@@ -1,0 +1,38 @@
+# ========================================
+# Prometheus Configuration - Agent Only
+# ========================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'ai-agent-sdk'
+    environment: 'production'
+
+scrape_configs:
+  # Agent metrics
+  - job_name: 'agent'
+    static_configs:
+      - targets: ['agent:8000']
+        labels:
+          service: 'agent'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+  
+  # Infrastructure metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+        labels:
+          service: 'redis'
+  
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+        labels:
+          service: 'postgres'
+  
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
