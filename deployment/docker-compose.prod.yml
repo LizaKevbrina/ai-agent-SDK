@@ -1,0 +1,436 @@
+# ========================================
+# AI Agent SDK - Production Docker Compose
+# Optimized for VPS deployment with security hardening
+# ========================================
+
+version: '3.8'
+
+services:
+  # ========================================
+  # AI AGENT APPLICATION
+  # ========================================
+  agent:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        - ENVIRONMENT=production
+    image: ai-agent-sdk:${VERSION:-latest}
+    container_name: ai-agent-prod
+    restart: unless-stopped
+    
+    ports:
+      - "8000:8000"
+    
+    environment:
+      # Application
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - APP_NAME=AI Real Estate Agent
+      - VERSION=${VERSION:-2.0.0}
+      
+      # Database (using secrets)
+      - POSTGRES_URL=postgresql://ai_user:${POSTGRES_PASSWORD}@postgres:5432/ai_db
+      - REDIS_URL=redis://redis:6379
+      
+      # External APIs (using Docker secrets)
+      - YANDEX_API_KEY_FILE=/run/secrets/yandex_api_key
+      - YANDEX_FOLDER_ID_FILE=/run/secrets/yandex_folder_id
+      - SUPABASE_URL_FILE=/run/secrets/supabase_url
+      - SUPABASE_KEY_FILE=/run/secrets/supabase_key
+      
+      # LLM Configuration
+      - DEFAULT_LLM_MODEL=gpt-4
+      - TEMPERATURE=0.7
+      - MAX_TOKENS=2000
+      
+      # RAG Configuration
+      - SIMILARITY_THRESHOLD=0.7
+      - RAG_TOP_K=5
+      
+      # Memory Configuration
+      - MEMORY_WINDOW_SIZE=40
+      - DEFAULT_PROMPT_VERSION=v1
+      
+      # Circuit Breaker
+      - CIRCUIT_BREAKER_FAIL_MAX=5
+      - CIRCUIT_BREAKER_TIMEOUT=60
+      
+      # Monitoring
+      - PROMETHEUS_PORT=9090
+    
+    secrets:
+      - yandex_api_key
+      - yandex_folder_id
+      - supabase_url
+      - supabase_key
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    networks:
+      - ai-network
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    security_opt:
+      - no-new-privileges:true
+    
+    read_only: false
+    tmpfs:
+      - /tmp
+  
+  # ========================================
+  # POSTGRESQL DATABASE
+  # ========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: ai-postgres-prod
+    restart: unless-stopped
+    
+    ports:
+      - "127.0.0.1:5432:5432"  # Only localhost access
+    
+    environment:
+      - POSTGRES_USER=ai_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=ai_db
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./postgres-backup:/backup
+    
+    networks:
+      - ai-network
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_user -d ai_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    command: >
+      postgres
+      -c max_connections=100
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=2621kB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c max_worker_processes=4
+      -c max_parallel_workers_per_gather=2
+      -c max_parallel_workers=4
+      -c max_parallel_maintenance_workers=2
+  
+  # ========================================
+  # REDIS CACHE
+  # ========================================
+  redis:
+    image: redis:7-alpine
+    container_name: ai-redis-prod
+    restart: unless-stopped
+    
+    ports:
+      - "127.0.0.1:6379:6379"  # Only localhost access
+    
+    volumes:
+      - redis_data:/data
+    
+    networks:
+      - ai-network
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+    
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+  
+  # ========================================
+  # PROMETHEUS MONITORING
+  # ========================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ai-prometheus-prod
+    restart: unless-stopped
+    
+    ports:
+      - "127.0.0.1:9090:9090"  # Only localhost access
+    
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    
+    networks:
+      - ai-network
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+  
+  # ========================================
+  # GRAFANA DASHBOARDS
+  # ========================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ai-grafana-prod
+    restart: unless-stopped
+    
+    ports:
+      - "127.0.0.1:3000:3000"  # Only localhost access
+    
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_SECURITY_DISABLE_GRAVATAR=true
+      - GF_SNAPSHOTS_EXTERNAL_ENABLED=false
+    
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    
+    depends_on:
+      - prometheus
+    
+    networks:
+      - ai-network
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+  
+  # ========================================
+  # ALERTMANAGER (Optional)
+  # ========================================
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: ai-alertmanager-prod
+    restart: unless-stopped
+    
+    ports:
+      - "127.0.0.1:9093:9093"
+    
+    volumes:
+      - ../monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    
+    networks:
+      - ai-network
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+  
+  # ========================================
+  # NGINX REVERSE PROXY (Optional)
+  # ========================================
+  nginx:
+    image: nginx:alpine
+    container_name: ai-nginx-prod
+    restart: unless-stopped
+    
+    ports:
+      - "80:80"
+      - "443:443"
+    
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    
+    depends_on:
+      - agent
+    
+    networks:
+      - ai-network
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ========================================
+# DOCKER SECRETS
+# ========================================
+secrets:
+  yandex_api_key:
+    file: ../secrets/yandex_api_key.txt
+  yandex_folder_id:
+    file: ../secrets/yandex_folder_id.txt
+  supabase_url:
+    file: ../secrets/supabase_url.txt
+  supabase_key:
+    file: ../secrets/supabase_key.txt
+
+# ========================================
+# VOLUMES (Named for persistence)
+# ========================================
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/ai-agent/postgres
+  
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/ai-agent/redis
+  
+  prometheus_data:
+    driver: local
+  
+  grafana_data:
+    driver: local
+  
+  alertmanager_data:
+    driver: local
+  
+  nginx_logs:
+    driver: local
+
+# ========================================
+# NETWORKS
+# ========================================
+networks:
+  ai-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: br-ai-agent
