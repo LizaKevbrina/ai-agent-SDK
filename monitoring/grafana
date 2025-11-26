@@ -1,0 +1,649 @@
+{
+  "dashboard": {
+    "title": "AI Agent SDK - Production Dashboard",
+    "tags": ["ai-agent", "production", "llm", "rag"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "10s",
+    
+    "panels": [
+      {
+        "id": 1,
+        "title": "🎯 Request Rate (requests/sec)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(agent_requests_total[5m])) by (status)",
+            "legendFormat": "{{status}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "reqps"
+          }
+        },
+        "options": {
+          "legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "lastNotNull"]}
+        }
+      },
+      
+      {
+        "id": 2,
+        "title": "⚡ P95 Latency (агент)",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(agent_duration_seconds_bucket[5m]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 2, "color": "yellow"},
+                {"value": 5, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {"calcs": ["lastNotNull"]},
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "graphMode": "area"
+        }
+      },
+      
+      {
+        "id": 3,
+        "title": "❌ Error Rate (%)",
+        "type": "stat",
+        "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(rate(agent_requests_total{status=\"error\"}[5m])) / sum(rate(agent_requests_total[5m])) * 100",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 5, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {"calcs": ["lastNotNull"]},
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "graphMode": "area"
+        }
+      },
+      
+      {
+        "id": 4,
+        "title": "💰 Token Usage (total/hour)",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 4, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(increase(llm_tokens_used_sum[1h]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 100000, "color": "yellow"},
+                {"value": 500000, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {"calcs": ["lastNotNull"]},
+          "orientation": "auto",
+          "textMode": "value_and_name"
+        }
+      },
+      
+      {
+        "id": 5,
+        "title": "💸 Estimated Cost ($/hour at $2/1M tokens)",
+        "type": "stat",
+        "gridPos": {"x": 18, "y": 4, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "(sum(increase(llm_tokens_used_sum[1h])) / 1000000) * 2",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD",
+            "decimals": 2,
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 5, "color": "yellow"},
+                {"value": 20, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {"calcs": ["lastNotNull"]},
+          "orientation": "auto",
+          "textMode": "value_and_name"
+        }
+      },
+      
+      {
+        "id": 6,
+        "title": "📊 Sales Funnel Conversion",
+        "type": "bargauge",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(funnel_step_reached_total{step=\"greeting\"})",
+            "legendFormat": "1️⃣ Greeting",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(funnel_step_reached_total{step=\"needs_discovery\"})",
+            "legendFormat": "2️⃣ Needs Discovery",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(funnel_step_reached_total{step=\"presentation\"})",
+            "legendFormat": "3️⃣ Presentation",
+            "refId": "C"
+          },
+          {
+            "expr": "sum(funnel_step_reached_total{step=\"objection_handling\"})",
+            "legendFormat": "4️⃣ Objections",
+            "refId": "D"
+          },
+          {
+            "expr": "sum(funnel_step_reached_total{step=\"closing\"})",
+            "legendFormat": "5️⃣ Closing",
+            "refId": "E"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "palette-classic"},
+            "max": 100
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "showUnfilled": true
+        }
+      },
+      
+      {
+        "id": 7,
+        "title": "🎯 User Intent Distribution",
+        "type": "piechart",
+        "gridPos": {"x": 12, "y": 8, "w": 6, "h": 8},
+        "targets": [
+          {
+            "expr": "sum by (intent_type) (user_intent_total)",
+            "legendFormat": "{{intent_type}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right"},
+          "pieType": "pie",
+          "displayLabels": ["name", "percent"]
+        }
+      },
+      
+      {
+        "id": 8,
+        "title": "📞 Successful Closings (total)",
+        "type": "stat",
+        "gridPos": {"x": 18, "y": 8, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(successful_closings_total)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 1, "color": "yellow"},
+                {"value": 5, "color": "green"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {"calcs": ["lastNotNull"]},
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "graphMode": "area"
+        }
+      },
+      
+      {
+        "id": 9,
+        "title": "📈 Conversion Rate (closings/greetings)",
+        "type": "stat",
+        "gridPos": {"x": 18, "y": 12, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "(sum(successful_closings_total) / sum(funnel_step_reached_total{step=\"greeting\"})) * 100",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 1,
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 5, "color": "yellow"},
+                {"value": 10, "color": "green"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {"calcs": ["lastNotNull"]},
+          "orientation": "auto",
+          "textMode": "value_and_name"
+        }
+      },
+      
+      {
+        "id": 10,
+        "title": "🛠️ Tool Usage Distribution",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(tool_calls_total[5m])) by (tool_name, status)",
+            "legendFormat": "{{tool_name}} ({{status}})",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "color": {"mode": "palette-classic"}
+          }
+        },
+        "options": {
+          "legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "lastNotNull"]}
+        }
+      },
+      
+      {
+        "id": 11,
+        "title": "⚡ Tool Performance (P95 latency)",
+        "type": "bargauge",
+        "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(tool_duration_seconds_bucket[5m])) by (tool_name)",
+            "legendFormat": "{{tool_name}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 3, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient"
+        }
+      },
+      
+      {
+        "id": 12,
+        "title": "💾 Cache Hit Rate (%)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 24, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "(sum(rate(cache_operations_total{operation=\"hit\"}[5m])) / (sum(rate(cache_operations_total{operation=\"hit\"}[5m])) + sum(rate(cache_operations_total{operation=\"miss\"}[5m])))) * 100",
+            "legendFormat": "Hit Rate",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "color": {"mode": "palette-classic"},
+            "max": 100
+          }
+        },
+        "options": {
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        }
+      },
+      
+      {
+        "id": 13,
+        "title": "⚡ LLM Circuit Breaker Opens",
+        "type": "stat",
+        "gridPos": {"x": 8, "y": 24, "w": 4, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(increase(llm_circuit_breaker_opens_total[1h]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 5, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {"calcs": ["lastNotNull"]},
+          "orientation": "auto",
+          "textMode": "value_and_name"
+        }
+      },
+      
+      {
+        "id": 14,
+        "title": "🚫 Rate Limit Hits",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 24, "w": 4, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(increase(llm_rate_limits_total[1h]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 10, "color": "yellow"},
+                {"value": 50, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {"calcs": ["lastNotNull"]},
+          "orientation": "auto",
+          "textMode": "value_and_name"
+        }
+      },
+      
+      {
+        "id": 15,
+        "title": "🛡️ Security: Blocked Requests",
+        "type": "stat",
+        "gridPos": {"x": 16, "y": 24, "w": 4, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(increase(security_validation_total{status=\"blocked\"}[1h]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 10, "color": "yellow"},
+                {"value": 50, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {"calcs": ["lastNotNull"]},
+          "orientation": "auto",
+          "textMode": "value_and_name"
+        }
+      },
+      
+      {
+        "id": 16,
+        "title": "🛡️ Security Threats Detected (by type)",
+        "type": "piechart",
+        "gridPos": {"x": 20, "y": 24, "w": 4, "h": 8},
+        "targets": [
+          {
+            "expr": "sum by (pattern_type) (security_threats_detected_total)",
+            "legendFormat": "{{pattern_type}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "list", "placement": "bottom"},
+          "pieType": "donut"
+        }
+      },
+      
+      {
+        "id": 17,
+        "title": "🧠 Memory Operations",
+        "type": "graph",
+        "gridPos": {"x": 8, "y": 28, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(memory_operations_total[5m])) by (operation, status)",
+            "legendFormat": "{{operation}} ({{status}})",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      
+      {
+        "id": 18,
+        "title": "📊 RAG: Documents Found (avg)",
+        "type": "stat",
+        "gridPos": {"x": 16, "y": 28, "w": 4, "h": 4},
+        "targets": [
+          {
+            "expr": "avg(rag_documents_filtered)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 1,
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 1, "color": "yellow"},
+                {"value": 3, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      
+      {
+        "id": 19,
+        "title": "🔍 RAG: Low Similarity Results",
+        "type": "stat",
+        "gridPos": {"x": 20, "y": 28, "w": 4, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(increase(rag_low_similarity_total[1h]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 10, "color": "yellow"},
+                {"value": 50, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      
+      {
+        "id": 20,
+        "title": "📊 System: Active Sessions",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 32, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "active_sessions",
+            "legendFormat": "Active Sessions",
+            "refId": "A"
+          },
+          {
+            "expr": "active_users",
+            "legendFormat": "Active Users",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      
+      {
+        "id": 21,
+        "title": "💻 System: Resource Usage",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 32, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total[5m]) * 100",
+            "legendFormat": "CPU %",
+            "refId": "A"
+          },
+          {
+            "expr": "process_resident_memory_bytes / 1024 / 1024",
+            "legendFormat": "Memory (MB)",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      }
+    ],
+    
+    "annotations": {
+      "list": [
+        {
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "ALERTS{alertstate=\"firing\"}",
+          "iconColor": "red",
+          "name": "Active Alerts",
+          "tagKeys": "alertname,severity"
+        }
+      ]
+    },
+    
+    "templating": {
+      "list": [
+        {
+          "name": "time_range",
+          "type": "interval",
+          "options": ["5m", "15m", "30m", "1h", "6h", "24h"],
+          "current": {"value": "5m"}
+        }
+      ]
+    },
+    
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]
+    }
+  }
+}
