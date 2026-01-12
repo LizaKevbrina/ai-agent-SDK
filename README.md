@@ -527,19 +527,10 @@ MIT License — см. [LICENSE](LICENSE)
 
 **Елизавета Кевбрина**
 
-*LLM Engineer • AI/ML Developer*
+*Prompt Engineer • AI Engineer*
 
 [![Email](https://img.shields.io/badge/Email-elisa.kevbrina%40yandex.ru-red?style=flat-square&logo=gmail)](mailto:elisa.kevbrina@yandex.ru)
 [![GitHub](https://img.shields.io/badge/GitHub-%40LizaKevbrina-black?style=flat-square&logo=github)](https://github.com/LizaKevbrina)
-
----
-
-###  Что демонстрирует этот проект
-
-**Backend Engineering:** FastAPI, async/await, PostgreSQL, Redis, connection pooling  
-**AI/ML Engineering:** LangChain agents, RAG, prompt engineering, LLM integration  
-**DevOps:** Docker, Prometheus, Grafana, circuit breaker, retry logic  
-**Quality:** 92% test coverage, load testing, chaos engineering, security
 
 ---
 
